@@ -1,106 +1,18 @@
-"use client";
-
-import { useMemo, useState } from "react";
-import Header from "../components/Header";
-import ProductCard from "../components/ProductCard";
-import CartSidebar from "../components/CartSidebar";
 import { products, coupons } from "../features/shop/data";
-import type { CartItem, Coupon } from "../types";
 import { formatCurrency } from "../lib/format";
+import Script from "next/script";
 
 export default function Home() {
-  const [cart, setCart] = useState<Record<number, number>>({});
-  const [couponCode, setCouponCode] = useState("");
-  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
-  const [couponMessage, setCouponMessage] = useState<string>("");
-
-  const cartItems: CartItem[] = useMemo(
-    () =>
-      products
-        .filter((product) => cart[product.id] > 0)
-        .map((product) => ({
-          ...product,
-          quantity: cart[product.id] ?? 0,
-        })),
-    [cart]
-  );
-
-  const totalPrice = useMemo(
-    () => cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
-    [cartItems]
-  );
-
-  const addToCart = (productId: number) => {
-    const product = products.find((item) => item.id === productId);
-    if (!product) return;
-    setCart((prev) => {
-      const currentQuantity = prev[productId] ?? 0;
-      if (currentQuantity >= product.stock) return prev;
-      return {
-        ...prev,
-        [productId]: currentQuantity + 1,
-      };
-    });
-  };
-
-  const changeQuantity = (productId: number, delta: number) => {
-    const product = products.find((item) => item.id === productId);
-    if (!product) return;
-    setCart((prev) => {
-      const nextQuantity = (prev[productId] ?? 0) + delta;
-      if (nextQuantity <= 0) {
-        const nextCart = { ...prev };
-        delete nextCart[productId];
-        return nextCart;
-      }
-      if (nextQuantity > product.stock) {
-        return prev;
-      }
-      return {
-        ...prev,
-        [productId]: nextQuantity,
-      };
-    });
-  };
-
-  const discount = useMemo(() => {
-    if (!appliedCoupon) return 0;
-    if (appliedCoupon.minimumTotal && totalPrice < appliedCoupon.minimumTotal) {
-      return 0;
-    }
-    if (appliedCoupon.percentOff) {
-      return Math.floor((totalPrice * appliedCoupon.percentOff) / 100);
-    }
-    return appliedCoupon.amountOff ?? 0;
-  }, [appliedCoupon, totalPrice]);
-
-  const discountedTotal = Math.max(totalPrice - discount, 0);
-
-  const applyCoupon = () => {
-    const normalized = couponCode.trim().toUpperCase();
-    const coupon = coupons.find((item) => item.code === normalized);
-    if (!coupon) {
-      setCouponMessage("無効なクーポンコードです。");
-      setAppliedCoupon(null);
-      return;
-    }
-    if (coupon.minimumTotal && totalPrice < coupon.minimumTotal) {
-      setCouponMessage(`このクーポンは合計${formatCurrency(coupon.minimumTotal)}以上でご利用いただけます。`);
-      setAppliedCoupon(null);
-      return;
-    }
-    setAppliedCoupon(coupon);
-    setCouponMessage(`クーポン「${coupon.code}」を適用しました。`);
-  };
-
-  const removeCoupon = () => {
-    setAppliedCoupon(null);
-    setCouponMessage("クーポンを解除しました。");
-  };
-
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-950">
-      <Header />
+    <div
+      id="shop"
+      className="min-h-screen bg-slate-50 text-slate-950"
+      data-products={JSON.stringify(products)}
+      data-coupons={JSON.stringify(coupons)}
+    >
+      <header className="w-full border-b bg-white/5 px-6 py-4">
+        <div className="mx-auto max-w-7xl">ECサイトデモストア</div>
+      </header>
       <main className="mx-auto max-w-7xl px-6 py-10">
         <section className="overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 px-8 py-12 text-white shadow-2xl shadow-slate-800/30 sm:px-12 sm:py-16">
           <div className="mx-auto flex max-w-5xl flex-col gap-10 lg:flex-row lg:items-end lg:justify-between">
@@ -129,8 +41,8 @@ export default function Home() {
             </div>
             <div className="rounded-[2rem] border border-white/10 bg-white/5 p-8 shadow-xl shadow-slate-950/20">
               <p className="text-sm uppercase tracking-[0.24em] text-slate-300">あなたのカート</p>
-              <p className="mt-4 text-4xl font-semibold text-white">{cartItems.length} 商品</p>
-              <p className="mt-2 text-slate-300">合計: {formatCurrency(totalPrice)}</p>
+              <p id="hero-item-count" className="mt-4 text-4xl font-semibold text-white">0 商品</p>
+              <p className="mt-2 text-slate-300">合計: <span id="hero-total">{formatCurrency(0)}</span></p>
             </div>
           </div>
         </section>
@@ -138,30 +50,43 @@ export default function Home() {
         <section className="mt-10 grid gap-6 xl:grid-cols-[1.5fr_0.9fr]">
           <div className="grid gap-6 md:grid-cols-2">
             {products.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                quantity={cart[product.id] ?? 0}
-                onAddToCart={addToCart}
-              />
+              <article key={product.id} data-product-id={product.id} className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.3em] text-slate-500">{product.category}</p>
+                    <h2 className="mt-4 text-2xl font-semibold text-slate-950">{product.name}</h2>
+                  </div>
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.28em] text-slate-600">{product.badge}</span>
+                </div>
+                <p className="mt-4 text-sm leading-7 text-slate-600">{product.description}</p>
+                <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-2xl font-semibold text-slate-950">{formatCurrency(product.price)}</p>
+                    <p className="mt-2 text-xs text-slate-500">在庫: {product.stock} 個</p>
+                  </div>
+                  <button type="button" data-action="add" className="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50">カートに追加</button>
+                </div>
+              </article>
             ))}
           </div>
 
-          <CartSidebar
-            cartItems={cartItems}
-            totalPrice={totalPrice}
-            discount={discount}
-            discountedTotal={discountedTotal}
-            couponCode={couponCode}
-            couponMessage={couponMessage}
-            appliedCoupon={appliedCoupon}
-            onChangeCouponCode={setCouponCode}
-            onApplyCoupon={applyCoupon}
-            onRemoveCoupon={removeCoupon}
-            onChangeQuantity={changeQuantity}
-          />
+          <aside id="cart" className="space-y-6 rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div><p className="text-sm font-semibold text-slate-500">注文概要</p><p className="mt-2 text-xs text-slate-400">数量を調整して購入準備を進めます。</p></div>
+              <span id="cart-count" className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-slate-600">0 種類</span>
+            </div>
+            <div id="cart-items"><div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-slate-500">カートに商品がありません。商品を追加してください。</div></div>
+            <div className="rounded-3xl bg-slate-950 p-5 text-white shadow-inner shadow-slate-900/10">
+              <div className="space-y-4">
+                <div><p className="text-sm uppercase tracking-[0.24em] text-slate-400">クーポンコード</p><div className="mt-3 flex flex-col gap-3 sm:flex-row"><input id="coupon-code" placeholder="例: SALE10" className="w-full rounded-2xl border border-white/15 bg-slate-100/10 px-4 py-3 text-sm text-white outline-none transition focus:border-white/60 focus:ring-1 focus:ring-white/20 sm:max-w-[220px]" /><button id="apply-coupon" type="button" disabled className="rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50">適用する</button></div><p id="coupon-message" className="mt-2 text-sm text-slate-300"></p></div>
+                <div id="applied-coupon"></div>
+              </div>
+              <div className="mt-6 rounded-3xl bg-slate-900/60 p-5"><div className="flex items-center justify-between text-sm text-slate-400"><span>小計</span><span id="subtotal">{formatCurrency(0)}</span></div><div className="mt-3 flex items-center justify-between text-sm text-slate-400"><span>割引</span><span id="discount">-{formatCurrency(0)}</span></div><p className="mt-6 text-sm uppercase tracking-[0.24em] text-slate-400">合計金額</p><p id="discounted-total" className="mt-3 text-3xl font-semibold">{formatCurrency(0)}</p><button id="checkout" type="button" disabled className="mt-6 w-full rounded-full bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50">レジに進む</button></div>
+            </div>
+          </aside>
         </section>
       </main>
+      <Script src="/shop.js" strategy="afterInteractive" />
     </div>
   );
 }
